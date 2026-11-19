@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<!--
+Crash Here First! has moved to https://crashherefirst.com/
+This page stays at the old address, https://crashherefirst.github.io/, only to send visitors on and to bring the work the
+simulator kept in their browser at this address (browser storage belongs to one address) to the new one. It reads every
+"crashHereFirst." item kept here, packs it into the last part of the link to the new address (after "#", which browsers
+never send to a server), and forwards the visitor after 5 seconds. When there is too much for a link, it waits for the
+visitor to press "Move my saved work", opens the new address in a new tab and hands the data over by a message between the
+two pages. The new page adds it without replacing anything. Nothing is deleted here.
+Copyright 2026 Cornwall (https://crashherefirst.com/)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="origin">
+<title>Crash Here First! has moved to crashherefirst.com</title>
+<style>
+  body { margin:0; font:16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#1c2530; background:#f4f6f8; }
+  main { max-width:620px; margin:12vh auto 0; background:#fff; border:1px solid #c9d2db; border-left:6px solid #0072B2; border-radius:6px; padding:18px 24px; }
+  h1 { font-size:22px; margin:0 0 10px; }
+  button { font:inherit; padding:7px 16px; border:1px solid #0072B2; border-radius:4px; background:#0072B2; color:#fff; cursor:pointer; }
+  button:hover { background:#005b8f; }
+  .small { font-size:13px; color:#5b6773; }
+  [hidden] { display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Crash Here First! has moved to crashherefirst.com.</h1>
+  <p id="say">Your work saved in this browser is coming with you. Taking you there in <span id="n">5</span> seconds...</p>
+  <p><button id="go">Go now</button> <button id="move" hidden>Move my saved work</button></p>
+  <p>Please update your bookmark.</p>
+  <p id="what" class="small"></p>
+  <noscript><p>Go to <a href="https://crashherefirst.com/">https://crashherefirst.com/</a>. (With scripts turned off, work saved in this browser at this address cannot be brought along.)</p></noscript>
+</main>
+<script>
+"use strict";
+const NEW="https://crashherefirst.com/", NEW_ORIGIN="https://crashherefirst.com", PREFIX="crashHereFirst.";
+const $=id=>document.getElementById(id);
+/* Everything the simulator kept in this browser at this address, except the self-tests' own items. */
+function collect(){ const items={}; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(PREFIX)&&!/selftest/i.test(k)) items[k]=localStorage.getItem(k); } }catch(e){} return items; }
+function bytesToB64u(u){ let s=""; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+async function encode(data){ const raw=new TextEncoder().encode(JSON.stringify(data));
+  if(typeof CompressionStream==="undefined") return "move0="+bytesToB64u(raw);
+  const z=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer()); return "move1="+bytesToB64u(z); }
+function describe(items){ const n=k=>{ try{ const v=JSON.parse(items[k]||"null"); return Array.isArray(v)?v.length:v&&Array.isArray(v.tools)?v.tools.length:0; }catch(e){ return 0; } }, pl=(c,w)=>c+" "+w+(c===1?"":"s"), parts=[];
+  const p=n(PREFIX+"myPrograms.v1"), t=n(PREFIX+"customTools.v1"), m=n(PREFIX+"machines.v1");
+  if(p) parts.push(pl(p,"project")); if(t) parts.push(pl(t,"custom tool")); if(m) parts.push(pl(m,"named machine"));
+  return parts.length ? "Coming with you: "+parts.join(", ")+" saved in this browser. They also stay here." : "No projects, custom tools or named machines are saved in this browser at this address."; }
+/* Links up to this length forward by themselves; Chromium browsers (Chrome, Edge) take very long addresses, others are kept to
+   a size every current browser is expected to accept (an estimate). Larger data go by the button. */
+const LIMIT=/Chrome\/|Chromium\/|Edg\//.test(navigator.userAgent)&&!/Firefox\//.test(navigator.userAgent) ? 1500000 : 60000;
+(async()=>{
+  const items=collect(), data={ v:1, from:location.host, at:new Date().toISOString(), items };
+  $("what").textContent=describe(items);
+  let link=NEW, packed=true;
+  if(Object.keys(items).length){ try{ link=NEW+"#"+await encode(data); }catch(e){ packed=false; } }
+  if(!packed||link.length>LIMIT){                                // too large for a link (or it could not be packed): the visitor presses the button
+    $("say").textContent="Your work saved in this browser is too large to carry in a link. Press \"Move my saved work\": crashherefirst.com opens in a new tab and your work is copied into it.";
+    $("move").hidden=false; $("go").textContent="Go without it";
+    let win=null;
+    window.addEventListener("message",ev=>{ if(ev.origin!==NEW_ORIGIN||!ev.data) return;
+      if(ev.data.chf==="ready"&&win) win.postMessage({ chf:"move", data },NEW_ORIGIN);
+      if(ev.data.chf==="moved"){ $("say").textContent=ev.data.ok?"Your saved work has been copied to crashherefirst.com, in the other tab. You can close this tab.":"Something went wrong while copying your saved work. It is still here; try again."; } });
+    $("move").onclick=()=>{ win=window.open(NEW+"#receive","_blank"); if(!win) $("say").textContent="The browser blocked the new tab. Allow pop-ups for this page and press the button again."; };
+    $("go").onclick=()=>{ location.href=NEW; };
+    return; }
+  let left=5; const tick=setInterval(()=>{ left--; $("n").textContent=String(Math.max(left,0)); if(left<=0){ clearInterval(tick); location.replace(link); } },1000);
+  $("go").onclick=()=>{ clearInterval(tick); location.replace(link); };
+})();
+</script>
+</body>
+</html>
